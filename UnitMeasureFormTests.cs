@@ -7,10 +7,13 @@ using Indotalent.Models.Entities;
 using Indotalent.Pages.ProductGroups;
 using Indotalent.Pages.UnitMeasures;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.AspNetCore.Session;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using NUnit.Framework;
@@ -53,12 +56,44 @@ namespace TestProject1
             // Crear la instancia del modelo de formulario utilizando el servicio real
             _unitMeasureFormModel = new UnitMeasureFormModel(_mapperMock.Object, _unitMeasureService);
 
-            // Configurar TempData para evitar errores de referencia nula
-            _unitMeasureFormModel.TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<ITempDataProvider>());
+            // Configurar TempData y ViewData para evitar errores de referencia nula
+            var httpContext = new DefaultHttpContext();
+            httpContext.Features.Set<ISessionFeature>(new SessionFeature());
+            httpContext.Session = new TestSession(); // Usamos una sesión de prueba
 
-            // Configurar HttpContext en PageContext directamente
-            _unitMeasureFormModel.PageContext.HttpContext = new DefaultHttpContext();
+            _unitMeasureFormModel.TempData = new TempDataDictionary(httpContext, Mock.Of<ITempDataProvider>());
+            _unitMeasureFormModel.PageContext = new PageContext
+            {
+                HttpContext = httpContext,
+                ViewData = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
+            };
+
+            _unitMeasureFormModel.ViewData["Title"] = "Test Title"; // Evitar errores de referencia nula en ViewData
         }
+
+        // Clase de sesión de prueba
+        public class TestSession : ISession
+        {
+            private readonly Dictionary<string, byte[]> _sessionStorage = new Dictionary<string, byte[]>();
+
+            public bool IsAvailable => true;
+            public string Id => Guid.NewGuid().ToString();
+            public IEnumerable<string> Keys => _sessionStorage.Keys;
+
+            public void Clear() => _sessionStorage.Clear();
+
+            public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+            public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+            public void Remove(string key) => _sessionStorage.Remove(key);
+
+            public void Set(string key, byte[] value) => _sessionStorage[key] = value;
+
+            public bool TryGetValue(string key, out byte[] value) => _sessionStorage.TryGetValue(key, out value);
+        }
+
+
 
 
 
@@ -264,6 +299,27 @@ namespace TestProject1
 
             Assert.IsNotNull(deletedUnitMeasure, "El registro debe existir en la base de datos.");
             Assert.IsFalse(deletedUnitMeasure.IsNotDeleted, "El registro debe estar marcado como eliminado (IsNotDeleted = false).");
+        }
+
+
+
+        [Test]
+        public async Task OnPostAsync_ModeloInvalido_MostrarMensajeFaltaName()
+        {
+            // Arrange
+            var invalidUnitMeasureModel = new UnitMeasureFormModel.UnitMeasureModel
+            {
+                Name = "", 
+                Description = "Unidad de volumen"
+            };
+
+            _unitMeasureFormModel.UnitMeasureForm = invalidUnitMeasureModel;
+            _unitMeasureFormModel.ModelState.AddModelError("Name", "The Name field is required.");
+
+            // Act & Assert
+            var ex = Assert.ThrowsAsync<Exception>(async () => await _unitMeasureFormModel.OnPostAsync(invalidUnitMeasureModel));
+            Assert.IsNotNull(ex);
+            Assert.IsTrue(ex.Message.Contains("The Name field is required."), $"Expected error message: 'The Name field is required.' but got: '{ex.Message}'");
         }
 
 

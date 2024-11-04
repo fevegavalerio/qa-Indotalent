@@ -265,6 +265,24 @@ namespace TestProject1
         }
 
 
+        [Test]
+        public async Task OnPostAsync_ModeloInvalido_MostrarMensajeFaltaName()
+        {
+            // Arrange
+            var invalidProductGroupModel = new ProductGroupFormModel.ProductGroupModel
+            {
+                Name = "", // Nombre vacío para forzar el error
+                Description = "Grupo de productos de prueba"
+            };
+
+            _productGroupFormModel.ProductGroupForm = invalidProductGroupModel;
+            _productGroupFormModel.ModelState.AddModelError("Name", "The Name field is required.");
+
+            // Act & Assert
+            var ex = Assert.ThrowsAsync<Exception>(async () => await _productGroupFormModel.OnPostAsync(invalidProductGroupModel));
+            Assert.IsNotNull(ex);
+            Assert.IsTrue(ex.Message.Contains("The Name field is required."), $"Expected error message: 'The Name field is required.' but got: '{ex.Message}'");
+        }
 
 
 
