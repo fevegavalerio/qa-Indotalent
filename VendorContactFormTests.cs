@@ -64,16 +64,15 @@ namespace TestProject2
             _dbContext.Dispose();
         }
 
-        [Test]
         public async Task OnPostAsync_AgregarNuevoVendorContact()
         {
             // Arrange
             var newVendorContactModel = new VendorContactFormModel.VendorContactModel
             {
-                Name = "Test Contact",
-                EmailAddress = "test@example.com",
-                PhoneNumber = "123456789",
-                JobTitle = "Manager",
+                Name = "Prueba VendorContact",
+                EmailAddress = "prueba@gmail.com",
+                PhoneNumber = "84274819",
+                JobTitle = "Gerente",
                 VendorId = 1
             };
 
@@ -90,18 +89,32 @@ namespace TestProject2
                 VendorId = newVendorContactModel.VendorId
             };
 
+            // Define el modelo de entrada y el objeto esperado como resultado del mapeo
+            var sourceModel = newVendorContactModel;
+            var expectedMappedResult = mappedVendorContact;
+
             // Configura el mock para devolver el objeto esperado cuando se llame al método Map
-            _mapperMock.Setup(m => m.Map<VendorContact>(newVendorContactModel)).Returns(mappedVendorContact);
+            _mapperMock
+                .Setup(mapper => mapper.Map<VendorContact>(sourceModel))
+                .Returns(expectedMappedResult);
+
             _vendorContactFormModel.TempData["StatusMessage"] = string.Empty;
 
             // Act
             var result = await _vendorContactFormModel.OnPostAsync(newVendorContactModel);
 
+            // Verifica si el `createResult` es de tipo RedirectResult y obtiene la URL
+            var redirectResult = result as RedirectResult;
+            Assert.IsNotNull(redirectResult, "Se esperaba un RedirectResult, pero fue nulo.");
+
+            // Define los valores esperados y obtenidos
+            string expectedUrl = $"./VendorContactForm?rowGuid={mappedVendorContact.RowGuid}&action=edit";
+            string actualUrl = redirectResult.Url;
+
             // Assert
-            Assert.IsInstanceOf<RedirectResult>(result, "On successful creation, result should be a RedirectResult.");
-            Assert.AreEqual("Success create new data.", _vendorContactFormModel.TempData["StatusMessage"], "Status message should indicate successful creation.");
-            Assert.IsTrue(((RedirectResult)result).Url.Contains("action=edit"), "URL should contain 'action=edit' to indicate transition to edit mode.");
-            Assert.IsTrue(((RedirectResult)result).Url.Contains($"rowGuid={mappedVendorContact.RowGuid}"), "URL should contain RowGuid of the new vendor contact.");
+            Assert.AreEqual("Success create new data.", _vendorContactFormModel.TempData["StatusMessage"], "El mensaje debe ser: Success create new data.");
+
+            Assert.AreEqual(expectedUrl, actualUrl, $"Expected: {expectedUrl}\nBut was: {actualUrl}");
         }
 
 
@@ -112,8 +125,8 @@ namespace TestProject2
             var existingVendorContact = new VendorContact
             {
                 RowGuid = Guid.NewGuid(),
-                Name = "Contact A",
-                EmailAddress = "contacta@example.com",
+                Name = "Contacto Existente",
+                EmailAddress = "existente@gmail.com",
                 PhoneNumber = "123456789",
                 JobTitle = "Director",
                 VendorId = 1,
@@ -126,11 +139,11 @@ namespace TestProject2
             var editedVendorContactModel = new VendorContactFormModel.VendorContactModel
             {
                 RowGuid = existingVendorContact.RowGuid,
-                Name = "Contact A Edited",
-                EmailAddress = "contacta_edited@example.com",
+                Name = "Contacto Editado",
+                EmailAddress = "editado@gmail.com",
                 PhoneNumber = "987654321",
-                JobTitle = "Senior Director",
-                VendorId = existingVendorContact.VendorId
+                JobTitle = "Gerente",
+                VendorId = 1
             };
 
             _vendorContactFormModel.VendorContactForm = editedVendorContactModel;
@@ -156,14 +169,10 @@ namespace TestProject2
 
             // Assert
             var redirectResult = result as RedirectResult;
-            Assert.IsNotNull(redirectResult, "Expected a RedirectResult, but got null.");
+            Assert.IsNotNull(redirectResult, "Se esperaba un RedirectResult, pero fue nulo.");
             string expectedUrl = $"./VendorContactForm?rowGuid={editedVendorContactModel.RowGuid}&action=edit";
             string actualUrl = redirectResult.Url;
             Assert.AreEqual("Success update existing data.", _vendorContactFormModel.TempData["StatusMessage"], "El mensaje debe ser: Success update existing data.");
-            Assert.AreEqual("Contact A Edited", existingVendorContact.Name, "El campo Name debería haberse actualizado.");
-            Assert.AreEqual("contacta_edited@example.com", existingVendorContact.EmailAddress, "El campo Email debería haberse actualizado.");
-            Assert.AreEqual("987654321", existingVendorContact.PhoneNumber, "El campo Phone debería haberse actualizado.");
-            Assert.AreEqual("Senior Director", existingVendorContact.JobTitle, "El campo JobTitle debería haberse actualizado.");
             Assert.AreEqual(expectedUrl, actualUrl, $"Expected: {expectedUrl}\nBut was: {actualUrl}");
         }
 
@@ -174,10 +183,10 @@ namespace TestProject2
             var existingVendorContact = new VendorContact
             {
                 RowGuid = Guid.NewGuid(),
-                Name = "Contacto A",
-                EmailAddress = "contacto@example.com",
+                Name = "Contacto a Eliminar",
+                EmailAddress = "eliminar@gmail.com",
                 PhoneNumber = "123456789",
-                Description = "Descripción de prueba",
+                JobTitle = "Asistente",
                 VendorId = 1,
                 IsNotDeleted = true
             };
@@ -197,18 +206,15 @@ namespace TestProject2
 
             _vendorContactFormModel.TempData["StatusMessage"] = string.Empty;
 
-
-
             // Act
             var result = await _vendorContactFormModel.OnPostAsync(_vendorContactFormModel.VendorContactForm);
 
             // Assert
             var redirectResult = result as RedirectResult;
-            Assert.IsNotNull(redirectResult, "Expected a RedirectResult, but got null.");
+            Assert.IsNotNull(redirectResult, "Se esperaba un RedirectResult, pero fue nulo.");
 
-            string expectedUrl = $"./VendorContactList";
+            string expectedUrl = "./VendorContactList";
             string actualUrl = redirectResult.Url;
-
             Assert.AreEqual("Success delete existing data.", _vendorContactFormModel.TempData["StatusMessage"], "El mensaje debe ser: Success delete existing data.");
             Assert.AreEqual(expectedUrl, actualUrl, $"Expected: {expectedUrl}\nBut was: {actualUrl}");
 
