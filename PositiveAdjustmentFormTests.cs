@@ -9,17 +9,11 @@ using Indotalent.Infrastructures.Repositories;
 using Indotalent.Models.Entities;
 using Indotalent.Pages.PositiveAdjustments;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Moq;
-using NUnit.Framework;
-using OpenQA.Selenium.BiDi.Modules.BrowsingContext;
-using System;
-using System.ComponentModel.DataAnnotations;
-using System.Threading.Tasks;
+
 
 namespace TestProject1
 {
@@ -124,6 +118,100 @@ namespace TestProject1
             Assert.AreEqual("Success create new data.", _positiveAdjustmentFormModel.TempData["StatusMessage"], "El mensaje debe ser: Success create new data.");
 
             Assert.AreEqual(expectedUrl, actualUrl, $"Expected: {expectedUrl}\nBut was: {actualUrl}");
+        }
+        [Test]
+        public async Task OnPostAsync_EditarPositiveAdjustment()
+        {
+            // Arrange
+            var existingPositiveAdjustment = new AdjustmentPlus
+            {
+                RowGuid = Guid.NewGuid(),
+                AdjustmentDate = DateTime.Now.AddDays(-1),
+                Description = "Initial Description",
+                IsNotDeleted = true
+            };
+
+            await _dbContext.AdjustmentPlus.AddAsync(existingPositiveAdjustment);
+            await _dbContext.SaveChangesAsync();
+
+            var editedPositiveAdjustmentModel = new PositiveAdjustmentFormModel.AdjustmentPlusModel
+            {
+                RowGuid = existingPositiveAdjustment.RowGuid,
+                AdjustmentDate = DateTime.Now,
+                Description = "Updated Description"
+            };
+
+            _positiveAdjustmentFormModel.AdjustmentPlusForm = editedPositiveAdjustmentModel;
+            _positiveAdjustmentFormModel.PageContext.HttpContext.Request.Query = new QueryCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                { "action", "edit" }
+            });
+
+            _mapperMock
+                .Setup(mapper => mapper.Map(editedPositiveAdjustmentModel, existingPositiveAdjustment))
+                .Callback((PositiveAdjustmentFormModel.AdjustmentPlusModel source, AdjustmentPlus destination) =>
+                {
+                    destination.AdjustmentDate = source.AdjustmentDate;
+                    destination.Description = source.Description;
+                });
+
+            _positiveAdjustmentFormModel.TempData["StatusMessage"] = string.Empty;
+
+            // Act
+            var result = await _positiveAdjustmentFormModel.OnPostAsync(editedPositiveAdjustmentModel);
+
+            // Assert
+            var redirectResult = result as RedirectResult;
+            Assert.IsNotNull(redirectResult, "Expected a RedirectResult, but got null.");
+            string expectedUrl = $"./PositiveAdjustmentForm?rowGuid={editedPositiveAdjustmentModel.RowGuid}&action=edit";
+            string actualUrl = redirectResult.Url;
+            Assert.AreEqual("Success update existing data.", _positiveAdjustmentFormModel.TempData["StatusMessage"], "El mensaje debe ser: Success update existing data.");
+            Assert.AreEqual("Updated Description", existingPositiveAdjustment.Description, "El campo Description debería haberse actualizado.");
+            Assert.AreEqual(expectedUrl, actualUrl, $"Expected: {expectedUrl}\nBut was: {actualUrl}");
+        }
+
+        [Test]
+        public async Task OnPostAsync_EliminarPositiveAdjustment()
+        {
+            // Arrange
+            var existingPositiveAdjustment = new AdjustmentPlus
+            {
+                RowGuid = Guid.NewGuid(),
+                AdjustmentDate = DateTime.Now,
+                Description = "To be deleted",
+                IsNotDeleted = true
+            };
+
+            await _dbContext.AdjustmentPlus.AddAsync(existingPositiveAdjustment);
+            await _dbContext.SaveChangesAsync();
+
+            _positiveAdjustmentFormModel.AdjustmentPlusForm = new PositiveAdjustmentFormModel.AdjustmentPlusModel
+            {
+                RowGuid = existingPositiveAdjustment.RowGuid
+            };
+
+            _positiveAdjustmentFormModel.PageContext.HttpContext.Request.Query = new QueryCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                { "action", "delete" }
+            });
+
+            _positiveAdjustmentFormModel.TempData["StatusMessage"] = string.Empty;
+
+            // Act
+            var result = await _positiveAdjustmentFormModel.OnPostAsync(_positiveAdjustmentFormModel.AdjustmentPlusForm);
+
+            // Assert
+            var redirectResult = result as RedirectResult;
+            Assert.IsNotNull(redirectResult, "Expected a RedirectResult, but got null.");
+
+            string expectedUrl = "./PositiveAdjustmentList";
+            string actualUrl = redirectResult.Url;
+            Assert.AreEqual("Success delete existing data.", _positiveAdjustmentFormModel.TempData["StatusMessage"], "El mensaje debe ser: Success delete existing data.");
+            Assert.AreEqual(expectedUrl, actualUrl, $"Expected: {expectedUrl}\nBut was: {actualUrl}");
+
+            var deletedPositiveAdjustment = await _dbContext.AdjustmentPlus.SingleOrDefaultAsync(u => u.RowGuid == existingPositiveAdjustment.RowGuid);
+            Assert.IsNotNull(deletedPositiveAdjustment, "El registro debe existir en la base de datos.");
+            Assert.IsFalse(deletedPositiveAdjustment.IsNotDeleted, "El registro debe estar marcado como eliminado (IsNotDeleted = false).");
         }
 
 
